@@ -1,0 +1,66 @@
+[package]
+name = "gen"
+version = "0.1.0"
+edition = "2024"
+
+
+[dependencies]
+common = { path = "../common" }
+
+# GUI 框架
+iced = { version = "0.14", features = ["tokio", "advanced"] }
+iced_aw = "0.13"
+font-kit = "0.14"
+
+# 异步运行时
+tokio = { version = "1", features = ["full"] }
+
+# 序列化
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# 文件处理
+zip = "0.6"
+walkdir = "2.4"
+filetime = "0.2"
+tempfile = "3.10"
+
+# XML 处理
+quick-xml = { version = "0.31", features = ["serialize"] }
+
+# 错误处理
+thiserror = "1.0"
+anyhow = "1.0"
+
+# 日志
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# 图像处理
+image = "0.24"
+
+# 编码转换
+encoding_rs = "0.8"
+encoding_rs_io = "0.1"
+
+# Windows 特定
+[target.'cfg(windows)'.dependencies]
+windows-service = "0.6"
+winreg = "0.52"
+winapi = { version = "0.3.9", features = ["winuser", "libloaderapi", "minwindef", "windef"] }
+
+[dev-dependencies]
+criterion = "0.5"
+
+[build-dependencies]
+winres = "0.1"
+embed-resource = "1.6"
+
+
+[features]
+default = ["embed_exe"]
+embed_exe = []
+
+[[bin]]
+name = "gen"
+path = "src/main.rs"

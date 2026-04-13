@@ -1,0 +1,13 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/common",
+    "crates/control",
+    "crates/gen",
+]
+
+default-members = [
+    "crates/control",
+    "crates/gen",
+]
+
