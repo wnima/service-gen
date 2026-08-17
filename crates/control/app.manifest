@@ -1,5 +1,35 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+<!-- 2. 启用视觉样式（关键：使用ComCtl32 v6现代控件） -->
+  <dependency>
+    <dependentAssembly>
+      <assemblyIdentity type="win32" name="Microsoft.Windows.Common-Controls" version="6.0.0.0" processorArchitecture="*" publicKeyToken="6595b64144ccf1df" language="*" />
+    </dependentAssembly>
+  </dependency>
+
+  <!-- 3. 高DPI感知（Win10/11高分屏清晰显示） -->
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">
+      <!-- 优先PerMonitorV2（Win10 1703+），降级PerMonitor -->
+      <dpiAwareness>PerMonitorV2, PerMonitor</dpiAwareness>
+      <!-- 兼容旧版系统：true/pm=PerMonitor -->
+      <dpiAware>true/pm</dpiAware>
+      <!-- 长路径支持（Win10 1607+） -->
+      <longPathAware>true</longPathAware>
+      <!-- 高分辨率滚动感知 -->
+      <highResolutionScrollingAware>true</highResolutionScrollingAware>
+    </windowsSettings>
+  </application>
+
+  <!-- 4. 系统兼容性（声明支持Win10/11，启用原生主题） -->
+  <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+    <application>
+      <!-- Win10/11（核心GUID） -->
+      <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}" />
+      <!-- Win8.1（可选） -->
+      <supportedOS Id="{1f676c76-80e1-4239-95bb-83d0f6d0da78}" />
+    </application>
+  </compatibility>
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
     <security>
       <requestedPrivileges>

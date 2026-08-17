@@ -176,6 +176,7 @@ impl AppState {
                 );
             }
 
+
             Message::ConfigSaved(path) => {
                 if let Some(p) = path {
                     if let Err(e) = self.save_config_to_file(&p) {

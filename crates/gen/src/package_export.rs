@@ -86,6 +86,9 @@ impl PackageExportService {
     }
 
     async fn create_executable(&self, config: &mut ServiceConfig) {
+        if config.executable != None {
+            return;
+        }
         // 组装可执行命令
         // 1. 是否指定 Java 可执行文件
         let exec_path = if let Some(java_exec) = &config.java_executable {

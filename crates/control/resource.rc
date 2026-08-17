@@ -1,0 +1,2 @@
+// Main application icon (resource ID must match MAKEINTRESOURCEW(1) in gui.rs)
+1 ICON "../../assets/icon.ico"

@@ -27,6 +27,8 @@ pub enum ConfigMessage {
     ServiceNameChanged(String),
     JarPathChanged(String),
     BrowseJarPressed,
+    UseCustomExecPressed(bool),
+    CustomExecPressed(String),
 }
 
 /// 启动模式
@@ -64,6 +66,8 @@ pub struct ConfigView {
     pub use_work_dir: bool,
     pub working_directory: String,
     pub include_jar: bool,
+    pub use_custom_exec: bool,
+    pub executable: String,
 }
 
 impl ConfigView {
@@ -86,7 +90,9 @@ impl ConfigView {
             failure_delay: "30".to_string(),
             use_work_dir: false,
             working_directory: String::new(),
-            include_jar: true,
+            include_jar: false,
+            use_custom_exec: false,
+            executable: String::new(),
         }
     }
 
@@ -161,6 +167,15 @@ impl ConfigView {
                     |result| crate::app_view::Message::JarFileSelected(result),
                 );
             }
+
+            ConfigMessage::UseCustomExecPressed(value) => {
+                self.use_custom_exec = value;
+            }
+
+            ConfigMessage::CustomExecPressed(value) => {
+                self.executable = value;
+            }
+            
         }
         Task::none()
     }
@@ -181,21 +196,6 @@ impl ConfigView {
         .padding(10)
         .width(width_num);
 
-        let jar_path_input = text_input("JAR 包路径", &self.jar_path)
-            .on_input(ConfigMessage::JarPathChanged)
-            .padding(10);
-        //.width(width_num - 55); // 留出空间给浏览按钮
-
-        let browse_button = button(text("浏览"))
-            .on_press(ConfigMessage::BrowseJarPressed)
-            .padding(10);
-
-        let jar_row = Row::new()
-            .push(jar_path_input)
-            .push(browse_button)
-            .spacing(10)
-            .width(width_num);
-
         // 服务描述
         let description_input = text_input("服务描述 (可选)", &self.description)
             .on_input(ConfigMessage::DescriptionChanged)
@@ -206,87 +206,124 @@ impl ConfigView {
         left_content = left_content.push(service_id_input);
         left_content = left_content.push(text("服务名称").size(12));
         left_content = left_content.push(service_name_input);
-        left_content = left_content.push(text("JAR 包路径").size(12));
-        left_content = left_content.push(jar_row);
         left_content = left_content.push(text("服务描述").size(12));
         left_content = left_content.push(description_input);
 
+        let custom_exec_checkbox = checkbox(self.use_custom_exec)
+            .label("自定义启动命令")
+            .on_toggle(ConfigMessage::UseCustomExecPressed);
+        left_content = left_content.push(custom_exec_checkbox);
+
         let mut center_content = column![];
-
-        center_content = center_content.push(text("Java 运行环境").size(12));
-
-        // Java 运行环境
-        let custom_java_checkbox = checkbox(self.use_custom_java)
-            .label("使用自定义 Java 路径")
-            .on_toggle(ConfigMessage::UseCustomJavaToggled);
-        center_content = center_content.push(custom_java_checkbox);
-
-        if self.use_custom_java {
-            let java_input = text_input("Java 可执行文件路径", &self.java_executable)
-                .on_input(ConfigMessage::JavaExecutableChanged)
+        if self.use_custom_exec {
+            let exec_input = text_input("E.g. java -jar app.jar", &self.executable)
+                .on_input(ConfigMessage::CustomExecPressed)
                 .padding(10)
                 .width(width_num);
-            center_content = center_content.push(java_input);
-        }
+            center_content = center_content.push(text("启动命令").size(12));
+            center_content = center_content.push(exec_input);
+        }else{
+            center_content = center_content.push(text("Java 运行环境").size(12));
 
-        // 打包 JRE
-        let bundle_jre_checkbox = checkbox(self.bundle_jre)
-            .label("打包 JRE（将整个 JRE 目录包含到输出包）")
-            .on_toggle(ConfigMessage::BundleJreToggled);
-        center_content = center_content.push(bundle_jre_checkbox);
+            // Java 运行环境
+            let custom_java_checkbox = checkbox(self.use_custom_java)
+                .label("使用自定义 Java 路径")
+                .on_toggle(ConfigMessage::UseCustomJavaToggled);
+            center_content = center_content.push(custom_java_checkbox);
 
-        if self.bundle_jre {
-            let jre_input = text_input("JRE 路径", &self.jre_path)
-                .on_input(ConfigMessage::JrePathChanged)
+            if self.use_custom_java {
+                let java_input = text_input("Java 可执行文件路径", &self.java_executable)
+                    .on_input(ConfigMessage::JavaExecutableChanged)
+                    .padding(10)
+                    .width(width_num);
+                center_content = center_content.push(java_input);
+            }
+
+            // 打包 JRE
+            let bundle_jre_checkbox = checkbox(self.bundle_jre)
+                .label("打包 JRE（将整个 JRE 目录包含到输出包）")
+                .on_toggle(ConfigMessage::BundleJreToggled);
+            center_content = center_content.push(bundle_jre_checkbox);
+
+            if self.bundle_jre {
+                let jre_input = text_input("JRE 路径", &self.jre_path)
+                    .on_input(ConfigMessage::JrePathChanged)
+                    .padding(10)
+                    .width(width_num);
+                center_content = center_content.push(jre_input);
+            }
+
+            // JVM 参数
+            let jvm_input = text_input("JVM 参数 (例如：-Xmx512m -Xms256m)", &self.jvm_options)
+                .on_input(ConfigMessage::JvmOptionsChanged)
                 .padding(10)
                 .width(width_num);
-            center_content = center_content.push(jre_input);
-        }
+            center_content = center_content.push(text("JVM 参数").size(12));
+            center_content = center_content.push(jvm_input);
 
-        // JVM 参数
-        let jvm_input = text_input("JVM 参数 (例如：-Xmx512m -Xms256m)", &self.jvm_options)
-            .on_input(ConfigMessage::JvmOptionsChanged)
-            .padding(10)
-            .width(width_num);
-        center_content = center_content.push(text("JVM 参数").size(12));
-        center_content = center_content.push(jvm_input);
-
-        // app参数
-        let app_args_input = text_input("应用启动参数 (例如：--server.port=8080)", &self.app_args)
-            .on_input(ConfigMessage::AppArgsChanged)
-            .padding(10)
-            .width(width_num);
-        center_content = center_content.push(text("应用启动参数").size(12));
-        center_content = center_content.push(app_args_input);
-
-        // 远程调试
-        let debug_checkbox = checkbox(self.enable_debug)
-            .label("启用远程调试")
-            .on_toggle(ConfigMessage::EnableDebugToggled);
-        center_content = center_content.push(debug_checkbox);
-
-        if self.enable_debug {
-            let port_input = text_input("调试端口", &self.debug_port)
-                .on_input(ConfigMessage::DebugPortChanged)
+            // app参数
+            let app_args_input = text_input("应用启动参数 (例如：--server.port=8080)", &self.app_args)
+                .on_input(ConfigMessage::AppArgsChanged)
                 .padding(10)
-                .width(Length::Fixed(150.0));
-            center_content = center_content.push(port_input);
+                .width(width_num);
+            center_content = center_content.push(text("应用启动参数").size(12));
+            center_content = center_content.push(app_args_input);
+
+            // 远程调试
+            let debug_checkbox = checkbox(self.enable_debug)
+                .label("启用远程调试")
+                .on_toggle(ConfigMessage::EnableDebugToggled);
+            center_content = center_content.push(debug_checkbox);
+
+            if self.enable_debug {
+                let port_input = text_input("调试端口", &self.debug_port)
+                    .on_input(ConfigMessage::DebugPortChanged)
+                    .padding(10)
+                    .width(Length::Fixed(150.0));
+                center_content = center_content.push(port_input);
+            }
+
+            let jar_path_input = text_input("JAR 包路径", &self.jar_path)
+                .on_input(ConfigMessage::JarPathChanged)
+                .padding(10);
+            //.width(width_num - 55); // 留出空间给浏览按钮
+
+            let browse_button = button(text("浏览"))
+                .on_press(ConfigMessage::BrowseJarPressed)
+                .padding(10);
+
+            let jar_row = Row::new()
+                .push(jar_path_input)
+                .push(browse_button)
+                .spacing(10)
+                .width(width_num);
+
+            
+            center_content = center_content.push(text("JAR 包路径").size(12));
+            center_content = center_content.push(jar_row);
+
+            // 打包选项
+            let include_jar_checkbox = checkbox(self.include_jar)
+                .label("包含 JAR 包到输出文件")
+                .on_toggle(ConfigMessage::IncludeJarToggled);
+            center_content = center_content.push(include_jar_checkbox);
+
         }
 
+        let mut right_content = column![];
         // 启动模式
-        center_content = center_content.push(text("启动模式").size(12));
-        center_content = center_content.push(
+        right_content = right_content.push(text("启动模式").size(12));
+        right_content = right_content.push(
             checkbox(matches!(self.start_mode, StartMode::Automatic))
                 .label("Automatic (自动启动)")
                 .on_toggle(|_| ConfigMessage::StartModeChanged("Automatic".to_string())),
         );
-        center_content = center_content.push(
+        right_content = right_content.push(
             checkbox(matches!(self.start_mode, StartMode::Manual))
                 .label("Manual (手动启动)")
                 .on_toggle(|_| ConfigMessage::StartModeChanged("Manual".to_string())),
         );
 
-        let mut right_content = column![];
         // 日志模式
         right_content = right_content.push(text("日志模式").size(12));
         right_content = right_content.push(
@@ -326,12 +363,6 @@ impl ConfigView {
                 .width(width_num);
             right_content = right_content.push(work_dir_input);
         }
-
-        // 打包选项
-        let include_jar_checkbox = checkbox(self.include_jar)
-            .label("包含 JAR 包到输出文件")
-            .on_toggle(ConfigMessage::IncludeJarToggled);
-        right_content = right_content.push(include_jar_checkbox);
 
         row![
             left_content.spacing(10).width(200),
@@ -393,6 +424,8 @@ impl ConfigView {
         }
 
         config.include_jar = self.include_jar;
+
+        config.executable = Some(self.executable.clone())
     }
 
     /// 从配置对象加载

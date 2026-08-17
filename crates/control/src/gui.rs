@@ -1,11 +1,12 @@
 use anyhow::Result;
 use common::models::service_config::ServiceConfig;
 use std::thread;
-use winapi::shared::minwindef::{FALSE, LPARAM, LRESULT, TRUE, UINT, WPARAM};
+use winapi::shared::minwindef::{BOOL, FALSE, LPARAM, LRESULT, TRUE, UINT, WPARAM};
 use winapi::shared::windef::{HMENU, HWND};
 use winapi::um::libloaderapi::GetModuleHandleW;
 use winapi::um::winuser::*;
-use winapi::um::winuser::{COLOR_BTNFACE, GetSysColorBrush};
+use winapi::um::winuser::{COLOR_WINDOW, GetSysColorBrush};
+use winapi::um::wingdi::{CreateFontIndirectW, DeleteObject};
 
 use crate::service_utils::{
     install_service, query_service_status, start_service, stop_service, uninstall_service,
@@ -25,6 +26,14 @@ const ID_START: i32 = 103;
 const ID_STOP: i32 = 104;
 const ID_STATUS: i32 = 201;
 
+
+/// EnumChildWindows 回调：给控件设置字体
+unsafe extern "system" fn apply_font_to_child(child: HWND, font: LPARAM) -> BOOL {
+    unsafe {
+        SendMessageW(child, WM_SETFONT, font as WPARAM, TRUE as LPARAM);
+        TRUE
+    }
+}
 
 /// 窗口过程
 unsafe extern "system" fn wnd_proc(
@@ -46,8 +55,8 @@ unsafe extern "system" fn wnd_proc(
                     to_wstring("STATIC").as_ptr(),
                     to_wstring(&format!("服务: {}", cfg.service_id)).as_ptr(),
                     WS_CHILD | WS_VISIBLE,
-                    20,
-                    20,
+                    5,
+                    5,
                     360,
                     20,
                     hwnd,
@@ -60,8 +69,8 @@ unsafe extern "system" fn wnd_proc(
                     to_wstring("BUTTON").as_ptr(),
                     to_wstring("安装").as_ptr(),
                     WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-                    20,
-                    60,
+                    5,
+                    35,
                     160,
                     40,
                     hwnd,
@@ -74,8 +83,8 @@ unsafe extern "system" fn wnd_proc(
                     to_wstring("BUTTON").as_ptr(),
                     to_wstring("卸载").as_ptr(),
                     WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-                    220,
-                    60,
+                    205,
+                    35,
                     160,
                     40,
                     hwnd,
@@ -88,8 +97,8 @@ unsafe extern "system" fn wnd_proc(
                     to_wstring("BUTTON").as_ptr(),
                     to_wstring("启动").as_ptr(),
                     WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-                    20,
-                    120,
+                    5,
+                    95,
                     160,
                     40,
                     hwnd,
@@ -102,8 +111,8 @@ unsafe extern "system" fn wnd_proc(
                     to_wstring("BUTTON").as_ptr(),
                     to_wstring("停止").as_ptr(),
                     WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-                    220,
-                    120,
+                    205,
+                    95,
                     160,
                     40,
                     hwnd,
@@ -116,8 +125,8 @@ unsafe extern "system" fn wnd_proc(
                     to_wstring("STATIC").as_ptr(),
                     to_wstring("状态: 查询中...").as_ptr(),
                     WS_CHILD | WS_VISIBLE | SS_LEFT,
-                    20,
-                    180,
+                    5,
+                    155,
                     360,
                     40,
                     hwnd,
@@ -125,6 +134,27 @@ unsafe extern "system" fn wnd_proc(
                     GetModuleHandleW(std::ptr::null()),
                     std::ptr::null_mut(),
                 );
+
+                // 设置系统消息字体（Segoe UI, ClearType, 适配 DPI）
+                let mut ncm: NONCLIENTMETRICSW = std::mem::zeroed();
+                ncm.cbSize = std::mem::size_of::<NONCLIENTMETRICSW>() as u32;
+                if SystemParametersInfoW(
+                    SPI_GETNONCLIENTMETRICS,
+                    ncm.cbSize,
+                    &mut ncm as *mut _ as *mut _,
+                    0,
+                ) != 0
+                {
+                    let font = CreateFontIndirectW(&ncm.lfMessageFont);
+                    if !font.is_null() {
+                        SetPropW(
+                            hwnd,
+                            to_wstring("UI_FONT").as_ptr(),
+                            font as *mut winapi::ctypes::c_void,
+                        );
+                        EnumChildWindows(hwnd, Some(apply_font_to_child), font as LPARAM);
+                    }
+                }
 
                 // 立即刷新一次
                 update_status_ui(hwnd, cfg);
@@ -154,6 +184,15 @@ unsafe extern "system" fn wnd_proc(
             }
 
             WM_DESTROY => {
+                // 释放字体
+                let font = GetPropW(
+                    hwnd,
+                    to_wstring("UI_FONT").as_ptr(),
+                );
+                if !font.is_null() {
+                    DeleteObject(font as *mut winapi::ctypes::c_void);
+                }
+                RemovePropW(hwnd, to_wstring("UI_FONT").as_ptr());
                 PostQuitMessage(0);
                 0
             }
@@ -183,6 +222,7 @@ fn update_status_ui(hwnd: HWND, cfg: &ServiceConfig) {
 /// 运行 GUI
 pub fn run_gui() -> Result<()> {
     write_wrapper_log("===== GUI 模式启动 =====");
+
     let config_result = read_config_from_exe();
     let config = match config_result {
         Ok(cfg) => cfg,
@@ -202,7 +242,7 @@ pub fn run_gui() -> Result<()> {
             lpfnWndProc: Some(wnd_proc),
             hInstance: hinstance,
             hCursor: LoadCursorW(std::ptr::null_mut(), IDC_ARROW),
-            hbrBackground: GetSysColorBrush(COLOR_BTNFACE),
+            hbrBackground: GetSysColorBrush(COLOR_WINDOW),
             lpszClassName: class_name.as_ptr(),
             hIcon: LoadIconW(hinstance, MAKEINTRESOURCEW(1)),
             hIconSm: LoadIconW(hinstance, MAKEINTRESOURCEW(1)),
@@ -217,7 +257,7 @@ pub fn run_gui() -> Result<()> {
             WS_OVERLAPPEDWINDOW | WS_VISIBLE,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
-            420,
+            400,
             260,
             std::ptr::null_mut(),
             std::ptr::null_mut(),
